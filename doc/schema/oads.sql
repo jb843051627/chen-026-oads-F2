@@ -172,3 +172,95 @@ INSERT IGNORE INTO t_oads_area_book (id, area_no, area_name, area_kind, road_nam
 VALUES (0, 'DU00', '澜原省江水市云桥区临江路段（主干道类，在册）', '主干道', '澜原省—江水市—云桥区—临江街巷', 0, 0, 'seed', NOW()),
        (1, 'DU01', '南津区北岸段·并走撤出的旧段册（已撤出）', '次干道', '澜原省—江水市—南津区—北岸街巷', 1, 0, 'seed', NOW());
 
+
+-- =====================================================================
+-- 设置许可核准单·新一套（三段签署数法另立承接，旧 t_oads_permit_bill 形状锁住不动）
+-- 八条口径的落库形状：主单/段节/签署留痕/受理登记簿/点位变更履历。
+-- 列名与基线实体契约（@TableName/@TableField）逐列对齐，改列必须同步实体。
+-- =====================================================================
+
+CREATE TABLE IF NOT EXISTS t_oads_permit_order (
+  id bigint NOT NULL COMMENT '主键',
+  order_no varchar(64) DEFAULT NULL COMMENT '核准单号（同一处点位、同一次变更只对应一张在办单）',
+  spot_no varchar(64) DEFAULT NULL COMMENT '点位码（挂点位底册，单据唯一来源）',
+  change_kind int DEFAULT NULL COMMENT '变更情形 0挂上去 1改位置 2整块拆除',
+  cur_stage int DEFAULT NULL COMMENT '整单当前段次 1窗口受理 2区局核定 3市局备案（服务端轧出，不设录入口）',
+  status int DEFAULT NULL COMMENT '整单情形 0在办 1已封存（封存后不进一笔不改一字）',
+  sealed_at datetime DEFAULT NULL COMMENT '走满封存那一刻',
+  del_flag int DEFAULT '0' COMMENT '删除标记 0正常 1删除',
+  create_by varchar(64) DEFAULT NULL COMMENT '创建者',
+  create_time datetime DEFAULT NULL COMMENT '创建时间',
+  update_by varchar(64) DEFAULT NULL COMMENT '更新者',
+  update_time datetime DEFAULT NULL COMMENT '更新时间',
+  remark varchar(500) DEFAULT NULL COMMENT '备注',
+  PRIMARY KEY (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='设置许可核准单·主单（新一套）';
+
+CREATE TABLE IF NOT EXISTS t_oads_permit_stage (
+  id bigint NOT NULL COMMENT '主键',
+  order_no varchar(64) DEFAULT NULL COMMENT '核准单号（挂主单）',
+  stage_no int DEFAULT NULL COMMENT '段次 1窗口受理 2区局核定 3市局备案',
+  need_count int DEFAULT NULL COMMENT '本段要求签署人数（1/2/2，立单时按数法落死）',
+  pass_rule int DEFAULT NULL COMMENT '本段通过规则 0一名即过 1先落单为论 2两人同认',
+  sign_count int DEFAULT '0' COMMENT '本轮已完成签署人数（只由服务端按落单先后逐笔累加，前端仅回显）',
+  round_no int DEFAULT '1' COMMENT '本轮轮次（被清掉重走一轮此数加一，文本按轮分存）',
+  status int DEFAULT NULL COMMENT '段节情形 0在签 1已通过 2待议（一同一不同挂起，不推进不终止）',
+  del_flag int DEFAULT '0' COMMENT '删除标记 0正常 1删除',
+  create_by varchar(64) DEFAULT NULL COMMENT '创建者',
+  create_time datetime DEFAULT NULL COMMENT '创建时间',
+  update_by varchar(64) DEFAULT NULL COMMENT '更新者',
+  update_time datetime DEFAULT NULL COMMENT '更新时间',
+  remark varchar(500) DEFAULT NULL COMMENT '备注',
+  PRIMARY KEY (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='设置许可核准单·段节';
+
+CREATE TABLE IF NOT EXISTS t_oads_permit_sign (
+  id bigint NOT NULL COMMENT '主键',
+  order_no varchar(64) DEFAULT NULL COMMENT '核准单号',
+  stage_no int DEFAULT NULL COMMENT '落在哪一段',
+  round_no int DEFAULT NULL COMMENT '哪一轮（本轮文本与上轮文本分开存放）',
+  signer varchar(64) DEFAULT NULL COMMENT '签署岗（受理岗/核定岗/备案岗）',
+  verdict int DEFAULT NULL COMMENT '落笔 0同意 1不同意',
+  opinion varchar(500) DEFAULT NULL COMMENT '签署文本（入库留痕，不改一字）',
+  signed_at datetime DEFAULT NULL COMMENT '落单那一刻（同一秒各自提交各自一笔，不得合并）',
+  del_flag int DEFAULT '0' COMMENT '删除标记 0正常 1删除',
+  create_by varchar(64) DEFAULT NULL COMMENT '创建者',
+  create_time datetime DEFAULT NULL COMMENT '创建时间',
+  update_by varchar(64) DEFAULT NULL COMMENT '更新者',
+  update_time datetime DEFAULT NULL COMMENT '更新时间',
+  remark varchar(500) DEFAULT NULL COMMENT '备注',
+  PRIMARY KEY (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='设置许可核准单·签署留痕（只插不改）';
+
+CREATE TABLE IF NOT EXISTS t_oads_accept_book (
+  id bigint NOT NULL COMMENT '主键',
+  order_no varchar(64) DEFAULT NULL COMMENT '核准单号（与主单同一次落库）',
+  spot_no varchar(64) DEFAULT NULL COMMENT '点位码',
+  change_kind int DEFAULT NULL COMMENT '变更情形 0挂上去 1改位置 2整块拆除',
+  oper_by varchar(64) DEFAULT NULL COMMENT '受理岗',
+  accepted_at datetime DEFAULT NULL COMMENT '受理那一刻（当日受理登记簿按此归日）',
+  del_flag int DEFAULT '0' COMMENT '删除标记 0正常 1删除',
+  create_by varchar(64) DEFAULT NULL COMMENT '创建者',
+  create_time datetime DEFAULT NULL COMMENT '创建时间',
+  update_by varchar(64) DEFAULT NULL COMMENT '更新者',
+  update_time datetime DEFAULT NULL COMMENT '更新时间',
+  remark varchar(500) DEFAULT NULL COMMENT '备注',
+  PRIMARY KEY (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='受理登记簿（立单一笔即登记一笔）';
+
+CREATE TABLE IF NOT EXISTS t_oads_spot_change_log (
+  id bigint NOT NULL COMMENT '主键',
+  spot_no varchar(64) DEFAULT NULL COMMENT '点位码（挂在点位行上）',
+  order_no varchar(64) DEFAULT NULL COMMENT '依据哪张单',
+  oper_by varchar(64) DEFAULT NULL COMMENT '由谁操作',
+  from_status int DEFAULT NULL COMMENT '从哪一档（册面情形改前值）',
+  to_status int DEFAULT NULL COMMENT '改到哪一档（册面情形改后值）',
+  changed_at datetime DEFAULT NULL COMMENT '发生于哪一时刻（与主档改动同一次处理）',
+  del_flag int DEFAULT '0' COMMENT '删除标记 0正常 1删除',
+  create_by varchar(64) DEFAULT NULL COMMENT '创建者',
+  create_time datetime DEFAULT NULL COMMENT '创建时间',
+  update_by varchar(64) DEFAULT NULL COMMENT '更新者',
+  update_time datetime DEFAULT NULL COMMENT '更新时间',
+  remark varchar(500) DEFAULT NULL COMMENT '备注',
+  PRIMARY KEY (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='点位变更履历（按时间倒序一段往回看）';
