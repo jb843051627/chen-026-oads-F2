@@ -31,35 +31,77 @@ public class TOadsPermitBill implements Serializable {
     @ApiModelProperty(value = "主键")
     private Long id;
 
-    /** 设置许可核准单 */
+    /** 设置许可核准单号 */
     @TableField("bill_no")
-    @ApiModelProperty(value = "设置许可核准单")
+    @ApiModelProperty(value = "设置许可核准单号")
     private String billNo;
 
-    /** 当前所在关 0..2（窗口受理/区局核准/市局备案） */
+    /** 单据来源：点位主档那一行的主键（只能由主档记录生成） */
+    @TableField("spot_id")
+    @JsonSerialize(using = ToStringSerializer.class)
+    @ApiModelProperty(value = "点位主档行主键（单据唯一来源）")
+    private Long spotId;
+
+    /** 点位码（建单时自点位主档冗余） */
+    @TableField("spot_no")
+    @ApiModelProperty(value = "点位码")
+    private String spotNo;
+
+    /** 本次变更情形 HANG挂上去 MOVE改位置 REMOVE整块拆除 */
+    @TableField("change_kind")
+    @ApiModelProperty(value = "变更情形 HANG/MOVE/REMOVE")
+    private String changeKind;
+
+    /** 变更前挂牌情形档 */
+    @TableField("from_state")
+    @ApiModelProperty(value = "变更前挂牌情形档")
+    private Integer fromState;
+
+    /** 变更后挂牌情形档（封存时写回主档） */
+    @TableField("to_state")
+    @ApiModelProperty(value = "变更后挂牌情形档")
+    private Integer toState;
+
+    /** 当前所在段 0..2（窗口受理/区局核定/市局备案，服务端计算，不采信报文） */
     @TableField("node_no")
-    @ApiModelProperty(value = "当前所在关 0..2（窗口受理/区局核准/市局备案）")
+    @ApiModelProperty(value = "当前所在段 0..2（服务端计算）")
     private Integer nodeNo;
 
-    /** 本关算齐办法 0一名即过 1两关须同判 */
+    /** 本段通过办法 0一名即过 1两关须同判 2先落为定（三段各用各的） */
     @TableField("sign_mode")
-    @ApiModelProperty(value = "本关算齐办法 0一名即过 1两关须同判")
+    @ApiModelProperty(value = "本段通过办法 0一名即过 1两关须同判 2先落为定")
     private Integer signMode;
 
-    /** 本关应签人数 */
+    /** 本段要求签署人数 */
     @TableField("need_count")
-    @ApiModelProperty(value = "本关应签人数")
+    @ApiModelProperty(value = "本段要求签署人数")
     private Integer needCount;
 
-    /** 本关已到人数 */
+    /** 本段本轮已落单笔数（只按留痕逐笔算，屏上仅回显） */
     @TableField("sign_count")
-    @ApiModelProperty(value = "本关已到人数")
+    @ApiModelProperty(value = "本段本轮已落单笔数（服务端累加，仅回显）")
     private Integer signCount;
 
-    /** 核准情形 0在签 1已点齐 2已压回 */
+    /** 本段当前轮次（本段被清一次加一轮） */
+    @TableField("round_no")
+    @ApiModelProperty(value = "本段当前轮次")
+    private Integer roundNo;
+
+    /** 核准情形 0在签(含待议) 1已点齐(已封存) 2已压回(本段本轮被否) */
     @TableField("status")
-    @ApiModelProperty(value = "核准情形 0在签 1已点齐 2已压回")
+    @ApiModelProperty(value = "核准情形 0在签 1已点齐(封存) 2已压回")
     private Integer status;
+
+    /** 在途去重令牌 同一点位同一种变更在途只一张；封存置空 */
+    @TableField("live_token")
+    @ApiModelProperty(value = "在途去重令牌")
+    private String liveToken;
+
+    /** 走满封存那一刻 */
+    @TableField("sealed_at")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss.SSS", timezone = "GMT+8")
+    @ApiModelProperty(value = "封存时刻")
+    private Date sealedAt;
 
     /** 删除标记 0正常 1删除 */
     @TableField("del_flag")
@@ -107,6 +149,70 @@ public class TOadsPermitBill implements Serializable {
 
     public void setBillNo(String billNo) {
         this.billNo = billNo;
+    }
+
+    public Long getSpotId() {
+        return spotId;
+    }
+
+    public void setSpotId(Long spotId) {
+        this.spotId = spotId;
+    }
+
+    public String getSpotNo() {
+        return spotNo;
+    }
+
+    public void setSpotNo(String spotNo) {
+        this.spotNo = spotNo;
+    }
+
+    public String getChangeKind() {
+        return changeKind;
+    }
+
+    public void setChangeKind(String changeKind) {
+        this.changeKind = changeKind;
+    }
+
+    public Integer getFromState() {
+        return fromState;
+    }
+
+    public void setFromState(Integer fromState) {
+        this.fromState = fromState;
+    }
+
+    public Integer getToState() {
+        return toState;
+    }
+
+    public void setToState(Integer toState) {
+        this.toState = toState;
+    }
+
+    public Integer getRoundNo() {
+        return roundNo;
+    }
+
+    public void setRoundNo(Integer roundNo) {
+        this.roundNo = roundNo;
+    }
+
+    public String getLiveToken() {
+        return liveToken;
+    }
+
+    public void setLiveToken(String liveToken) {
+        this.liveToken = liveToken;
+    }
+
+    public Date getSealedAt() {
+        return sealedAt;
+    }
+
+    public void setSealedAt(Date sealedAt) {
+        this.sealedAt = sealedAt;
     }
 
     public Integer getNodeNo() {

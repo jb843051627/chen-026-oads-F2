@@ -71,6 +71,16 @@ public class TOadsSpot implements Serializable {
     @ApiModelProperty(value = "随件交来的牌面题名与要件")
     private String content;
 
+    /** 挂牌情形档 0未挂设 1挂设在册 2整块拆除（只有核准单封存才许挪） */
+    @TableField("set_state")
+    @ApiModelProperty(value = "挂牌情形档 0未挂设 1挂设在册 2整块拆除")
+    private Integer setState;
+
+    /** 挂设档位 挂上去或改位置封存一次加一；拆除不进位 */
+    @TableField("set_ver")
+    @ApiModelProperty(value = "挂设档位")
+    private Integer setVer;
+
     /** 册面情形 0新入册 1已核齐 2缺项 */
     @TableField("status")
     @ApiModelProperty(value = "册面情形 0新入册 1已核齐 2缺项")
@@ -178,6 +188,22 @@ public class TOadsSpot implements Serializable {
 
     public void setContent(String content) {
         this.content = content;
+    }
+
+    public Integer getSetState() {
+        return setState;
+    }
+
+    public void setSetState(Integer setState) {
+        this.setState = setState;
+    }
+
+    public Integer getSetVer() {
+        return setVer;
+    }
+
+    public void setSetVer(Integer setVer) {
+        this.setVer = setVer;
     }
 
     public Integer getStatus() {

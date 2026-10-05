@@ -62,6 +62,9 @@ public class TOadsSpotServiceImpl extends ServiceImpl<TOadsSpotMapper, TOadsSpot
             return 0;
         }
         record.setAreaNo(refArch.getAreaNo());
+        // 挂牌情形档/挂设档位只许由设置许可核准单封存同一次处理挪：主档新建一律未挂设、第0档
+        record.setSetState(0);
+        record.setSetVer(0);
         if (StringUtils.isNotEmpty(record.getSpotNo())) {
             Integer dupCnt = this.baseMapper.selectCount(new QueryWrapper<TOadsSpot>()
                     .eq("spot_no", record.getSpotNo()).eq("del_flag", 0));
@@ -89,6 +92,13 @@ public class TOadsSpotServiceImpl extends ServiceImpl<TOadsSpotMapper, TOadsSpot
             if (dupCnt != null && dupCnt > 0) {
                 return 0;
             }
+        }
+
+        // 挂牌情形档/挂设档位的唯一挪法是核准单封存；通用修改入口报来的这两列一律不采信，压回现值
+        TOadsSpot current = this.baseMapper.selectById(record.getId());
+        if (current != null) {
+            record.setSetState(current.getSetState());
+            record.setSetVer(current.getSetVer());
         }
 
         record.setUpdateTime(new Date());

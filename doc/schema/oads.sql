@@ -109,20 +109,71 @@ CREATE TABLE IF NOT EXISTS t_oads_post_quota (
 
 CREATE TABLE IF NOT EXISTS t_oads_permit_bill (
   id bigint NOT NULL COMMENT '主键',
-  bill_no varchar(64) DEFAULT NULL COMMENT '设置许可核准单',
-  node_no int DEFAULT NULL COMMENT '当前所在关 0..2（窗口受理/区局核准/市局备案）',
-  sign_mode int DEFAULT NULL COMMENT '本关算齐办法 0一名即过 1两关须同判',
-  need_count int DEFAULT NULL COMMENT '本关应签人数',
-  sign_count int DEFAULT NULL COMMENT '本关已到人数',
-  status int DEFAULT NULL COMMENT '核准情形 0在签 1已点齐 2已压回',
+  bill_no varchar(64) DEFAULT NULL COMMENT '设置许可核准单号',
+  spot_id bigint DEFAULT NULL COMMENT '单据来源：点位主档那一行的主键（只能由主档记录生成）',
+  spot_no varchar(64) DEFAULT NULL COMMENT '点位码（建单时自点位主档冗余，封存后也不许改）',
+  change_kind varchar(16) DEFAULT NULL COMMENT '本次变更情形 HANG挂上去 MOVE改位置 REMOVE整块拆除',
+  from_state int DEFAULT NULL COMMENT '变更前挂牌情形档（建单时自主档点出）',
+  to_state int DEFAULT NULL COMMENT '变更后挂牌情形档（封存时同一次处理写回主档）',
+  node_no int DEFAULT NULL COMMENT '当前所在段 0..2（窗口受理/区局核准/市局备案，服务端计算，不采信报文）',
+  sign_mode int DEFAULT NULL COMMENT '本段通过办法 0一名即过 1两关须同判 2先落为定（三段各用各的，不许串用）',
+  need_count int DEFAULT NULL COMMENT '本段要求签署人数',
+  sign_count int DEFAULT NULL COMMENT '本段本轮已落单笔数（只按留痕逐笔算，屏上仅回显）',
+  round_no int DEFAULT '1' COMMENT '本段当前轮次（本段被清一次加一轮，老轮文本留在留痕表）',
+  status int DEFAULT NULL COMMENT '核准情形 0在签(含待议) 1已点齐(已封存) 2已压回(本段本轮被否)',
+  live_token varchar(128) DEFAULT NULL COMMENT '在途去重令牌 同一点位同一种变更在途只一张；封存置空',
+  sealed_at datetime(3) DEFAULT NULL COMMENT '走满封存那一刻（第三段两条同意齐备）',
   del_flag int DEFAULT '0' COMMENT '删除标记 0正常 1删除',
   create_by varchar(64) DEFAULT NULL COMMENT '创建者',
   create_time datetime DEFAULT NULL COMMENT '创建时间',
   update_by varchar(64) DEFAULT NULL COMMENT '更新者',
   update_time datetime DEFAULT NULL COMMENT '更新时间',
   remark varchar(500) DEFAULT NULL COMMENT '备注',
-  PRIMARY KEY (id)
+  PRIMARY KEY (id),
+  UNIQUE KEY uk_permit_live_token (live_token),
+  KEY idx_permit_spot (spot_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='设置许可核准单';
+
+-- 签署留痕：一次签署一行，只许追加不许改；清段只把 active 抹成 0，老轮文本继续可查。
+-- 段次(node_no)由服务端按单据当前段点出后落库，报文自称第几段不作数。
+CREATE TABLE IF NOT EXISTS t_oads_permit_sign (
+  id bigint NOT NULL COMMENT '主键',
+  bill_id bigint NOT NULL COMMENT '哪张核准单',
+  node_no int NOT NULL COMMENT '落单时服务端点出的段 0窗口受理 1区局核准 2市局备案',
+  round_no int NOT NULL COMMENT '本段轮次 清一段加一轮 本轮文本与上轮分开存放',
+  seq_no int NOT NULL COMMENT '本单本段本轮第几笔（逐笔累加，同秒各记各的也不并笔）',
+  sign_post varchar(32) DEFAULT NULL COMMENT '所在岗（服务端按段点出：窗口受理岗/区局核定岗/市局备案岗）',
+  signer varchar(64) NOT NULL COMMENT '签署人',
+  opinion int NOT NULL COMMENT '判断 1同意 2不同意',
+  content varchar(500) DEFAULT NULL COMMENT '签署文本，原文入库留痕',
+  sign_time datetime(3) NOT NULL COMMENT '各自落单时刻（毫秒计时，同一秒两笔仍为两条）',
+  active int DEFAULT '1' COMMENT '本轮是否在档 1当前轮 0随本段清轮退出（不删行，继续可查）',
+  create_by varchar(64) DEFAULT NULL COMMENT '创建者',
+  create_time datetime DEFAULT NULL COMMENT '创建时间',
+  PRIMARY KEY (id),
+  UNIQUE KEY uk_sign_once (bill_id, node_no, round_no, signer),
+  KEY idx_sign_bill_node (bill_id, node_no, active)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='核准单逐段签署留痕（ append-only ）';
+
+-- 点位主档变更履历：封存那一次处理里与主档改动同生的一条，事后按时间倒序回看。
+CREATE TABLE IF NOT EXISTS t_oads_spot_change (
+  id bigint NOT NULL COMMENT '主键',
+  spot_id bigint NOT NULL COMMENT '点位主档行',
+  spot_no varchar(64) DEFAULT NULL COMMENT '点位码',
+  bill_id bigint NOT NULL COMMENT '依据哪张核准单',
+  bill_no varchar(64) DEFAULT NULL COMMENT '依据的核准单号',
+  change_kind varchar(16) DEFAULT NULL COMMENT '变更情形 HANG挂上去 MOVE改位置 REMOVE整块拆除',
+  from_state int DEFAULT NULL COMMENT '从哪一档（挂牌情形档）',
+  to_state int DEFAULT NULL COMMENT '改到哪一档（挂牌情形档）',
+  from_ver int DEFAULT NULL COMMENT '变更前挂设档位',
+  to_ver int DEFAULT NULL COMMENT '变更后挂设档位',
+  operate_by varchar(64) DEFAULT NULL COMMENT '由谁操作（封存处理人）',
+  change_time datetime(3) NOT NULL COMMENT '发生于哪一时刻',
+  create_by varchar(64) DEFAULT NULL COMMENT '创建者',
+  create_time datetime DEFAULT NULL COMMENT '创建时间',
+  PRIMARY KEY (id),
+  KEY idx_change_spot_time (spot_id, change_time)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='点位主档变更履历（append-only）';
 
 CREATE TABLE IF NOT EXISTS t_oads_rule_line (
   id bigint NOT NULL COMMENT '主键',
@@ -155,6 +206,8 @@ CREATE TABLE IF NOT EXISTS t_oads_spot (
   got_num int DEFAULT NULL COMMENT '已核验落地处数',
   lack_num int DEFAULT NULL COMMENT '还差几处（轧出来，不手填）',
   content varchar(255) DEFAULT NULL COMMENT '随件交来的牌面题名与要件',
+  set_state int DEFAULT '0' COMMENT '挂牌情形档 0未挂设 1挂设在册 2整块拆除（只有核准单封存才许挪）',
+  set_ver int DEFAULT '0' COMMENT '挂设档位 挂上去或改位置封存一次加一；拆除不进位',
   status int DEFAULT NULL COMMENT '册面情形 0新入册 1已核齐 2缺项',
   del_flag int DEFAULT '0' COMMENT '删除标记 0正常 1删除',
   create_by varchar(64) DEFAULT NULL COMMENT '创建者',
